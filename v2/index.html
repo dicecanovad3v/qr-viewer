@@ -1,0 +1,1995 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>QR Master</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:#f5f7fa;color:#333;-webkit-text-size-adjust:100%}
+/* 内容不满一屏时垂直居中，避免出现大片底部留白；内容超出一屏时正常从顶部滚动 */
+#app{min-height:100vh;display:flex;flex-direction:column;justify-content:center}
+.loading{display:flex;justify-content:center;align-items:center;min-height:100vh;font-size:15px;color:#999}
+.error{text-align:center;padding:40px 20px;color:#999}
+.error p{margin-bottom:12px}
+.error .retry{display:inline-block;padding:10px 28px;background:#667eea;color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;text-decoration:none}
+
+/* 标题 */
+.page-title{text-align:center;padding:20px 16px 8px;font-size:20px;font-weight:600;color:#222;word-break:break-word}
+.page-subtitle{text-align:center;padding:0 16px 16px;font-size:13px;color:#999}
+
+/* 图片画廊 */
+.gallery{padding:0 12px 20px;max-width:700px;margin:0 auto;display:grid;gap:8px}
+.gallery.g-1{grid-template-columns:1fr}
+.gallery.g-2{grid-template-columns:1fr}
+.gallery.g-3{grid-template-columns:repeat(3,1fr)}
+.gallery.g-4{grid-template-columns:1fr 1fr}
+.gallery.g-many{grid-template-columns:repeat(3,1fr)}
+.gallery .img-wrap{border-radius:12px;overflow:hidden;cursor:pointer;position:relative}
+.gallery .img-wrap img{width:100%;display:block;transition:transform .2s}
+.gallery .img-wrap:active img{transform:scale(0.97)}
+.gallery.g-1 .img-wrap img,.gallery.g-2 .img-wrap img{max-height:60vh;object-fit:contain}
+.gallery.g-3 .img-wrap img,.gallery.g-many .img-wrap img{aspect-ratio:1/1;object-fit:cover}
+.gallery.g-4 .img-wrap img{aspect-ratio:4/3;object-fit:cover}
+.img-caption{font-size:12px;color:#666;text-align:center;padding:6px 4px;background:#fff}
+
+/* 全屏查看 */
+.fullscreen{display:none;position:fixed;inset:0;z-index:999;align-items:center;justify-content:center;background:rgba(0,0,0,.92)}
+.fullscreen.show{display:flex}
+.fullscreen img{max-width:95%;max-height:95%;object-fit:contain}
+.fullscreen .fs-close{position:absolute;top:16px;right:16px;color:#fff;font-size:28px;width:40px;height:40px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.15);border-radius:50%;cursor:pointer}
+.fullscreen .fs-counter{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.7);font-size:13px}
+
+/* 视频列表 */
+.video-list{padding:0 12px 20px;max-width:700px;margin:0 auto}
+.video-item{margin-bottom:12px;border-radius:12px;overflow:hidden;background:#000}
+.video-item video{width:100%;display:block;max-height:70vh}
+.video-label{padding:8px 12px;font-size:13px;color:#ccc;background:#111}
+
+/* 音频列表 */
+.audio-list{padding:0 16px 20px;max-width:500px;margin:0 auto}
+.audio-item{background:#fff;border-radius:14px;padding:16px;margin-bottom:10px;box-shadow:0 2px 12px rgba(0,0,0,.06)}
+.audio-item .audio-title{font-size:14px;font-weight:500;margin-bottom:8px;color:#333}
+.audio-item audio{width:100%}
+
+/* PDF/文档 */
+.doc-list{padding:0 16px 20px;max-width:500px;margin:0 auto}
+.doc-item{display:flex;align-items:center;background:#fff;border-radius:12px;padding:14px 16px;margin-bottom:8px;box-shadow:0 2px 12px rgba(0,0,0,.06);text-decoration:none;color:#333;cursor:pointer}
+.doc-item:active{background:#f8f8f8}
+.doc-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;margin-right:12px;flex-shrink:0}
+.doc-icon.pdf{background:#ffe8e8;color:#e53e3e}
+.doc-icon.doc{background:#e8f0fe;color:#1a73e8}
+.doc-icon.other{background:#f0f0f0;color:#666}
+.doc-name{flex:1;font-size:14px;word-break:break-all}
+.doc-arrow{color:#ccc;margin-left:8px;font-size:18px}
+
+/* 文字块 */
+.text-block{padding:8px 20px;max-width:700px;margin:0 auto}
+.text-block p{font-size:15px;line-height:1.7;color:#444;word-break:break-word;white-space:pre-wrap}
+.text-block p.text-bold{font-weight:600}
+.text-block p.text-center{text-align:center}
+.text-block p.text-left{text-align:left}
+.text-block p.text-right{text-align:right}
+
+/* 表单 */
+.form-section{padding:8px 16px 20px;max-width:500px;margin:0 auto}
+.form-card{background:#fff;border-radius:14px;padding:20px;box-shadow:0 2px 16px rgba(0,0,0,.06)}
+.form-card h3{font-size:16px;font-weight:600;margin-bottom:14px;color:#333}
+.form-field{margin-bottom:12px}
+.form-field label{display:block;font-size:13px;color:#555;margin-bottom:4px;font-weight:500}
+.form-field input,.form-field textarea,.form-field select{width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;background:#fafafa}
+.form-field.hrow{display:flex;align-items:center;gap:10px}
+.form-field.hrow label{margin-bottom:0;flex:none;white-space:nowrap}
+.form-field.hrow input{flex:1;width:auto;min-width:0}
+.form-field textarea{min-height:80px;resize:vertical}
+.form-field input:focus,.form-field textarea:focus,.form-field select:focus{outline:none;border-color:#667eea;background:#fff}
+.form-submit{width:100%;padding:12px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;margin-top:6px}
+.form-submit:active{opacity:.8}
+.form-success{text-align:center;padding:20px;color:#52c41a;font-size:15px}
+
+/* 单文件展示 */
+.single-image{display:flex;justify-content:center;align-items:flex-start;min-height:100vh;padding:12px;background:#000}
+.single-image img{max-width:100%;max-height:90vh;object-fit:contain;border-radius:4px}
+.single-video{display:flex;justify-content:center;align-items:center;min-height:100vh;background:#000}
+.single-video video{max-width:100%;max-height:100vh;width:100%}
+.single-audio{display:flex;justify-content:center;align-items:center;min-height:100vh;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);padding:20px}
+.single-audio .audio-card{background:rgba(255,255,255,.96);border-radius:24px;padding:36px 28px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.25);max-width:380px;width:90%}
+.single-audio .audio-icon{font-size:52px;margin-bottom:12px}
+.single-audio .audio-name{color:#333;font-size:16px;font-weight:600;margin-bottom:20px;word-break:break-all}
+.single-audio audio{width:100%;border-radius:8px}
+.audio-play-btn{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;border:none;border-radius:50px;padding:14px 32px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin:0 auto;min-width:160px;box-shadow:0 4px 15px rgba(102,126,234,.4);-webkit-tap-highlight-color:transparent}
+.audio-play-btn:active{transform:scale(.96)}
+.audio-play-btn .play-icon{font-size:18px}
+.audio-play-btn.playing{background:linear-gradient(135deg,#e74c3c 0%,#c0392b 100%)}
+.audio-progress{height:4px;background:rgba(0,0,0,.1);border-radius:2px;margin:16px 0 8px;overflow:hidden}
+.audio-progress-bar{height:100%;background:linear-gradient(90deg,#667eea,#764ba2);width:0%;transition:width .1s}
+.audio-time{font-size:13px;color:#666;margin-bottom:8px}
+.single-pdf{position:fixed;inset:0}
+.single-pdf iframe{width:100%;height:100%;border:none}
+.single-pdf-dl{position:fixed;left:0;right:0;bottom:0;z-index:5;text-align:center;padding:8px;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);font-size:12px}
+.single-pdf-dl a{color:#667eea;text-decoration:none}
+
+/* 分隔线 */
+.section-divider{height:1px;background:rgba(0,0,0,.06);margin:8px 20px}
+
+/* 评分组件 */
+.rating{display:flex;align-items:center;gap:4px;padding:4px 0}
+.rating .star{font-size:28px;cursor:pointer;color:#ddd;transition:color .15s;-webkit-tap-highlight-color:transparent}
+.rating .star.active{color:#ffc107}
+.rating .star:hover,.rating .star:active{color:#ffb300}
+.rating .num-rating{display:flex;gap:6px;flex-wrap:wrap}
+.rating .num-btn{width:36px;height:36px;border:1px solid #ddd;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;background:#fff}
+.rating .num-btn.active{background:#667eea;color:#fff;border-color:#667eea}
+
+/* 倒计时 */
+.countdown{display:flex;justify-content:center;gap:8px;padding:16px;margin:8px 16px}
+.countdown-item{text-align:center;background:#fff;border-radius:12px;padding:10px 14px;box-shadow:0 2px 12px rgba(0,0,0,.06);min-width:60px}
+.countdown-num{font-size:28px;font-weight:700;color:#667eea;line-height:1}
+.countdown-label{font-size:11px;color:#999;margin-top:4px}
+.countdown.ended .countdown-num{color:#999}
+
+/* 浏览量 */
+.view-count{text-align:center;padding:4px 16px 12px;font-size:12px;color:#999}
+.view-count span{color:#667eea;font-weight:600}
+
+/* vCard按钮 */
+.vcard-btn{display:flex;align-items:center;justify-content:center;gap:8px;margin:8px 16px;padding:12px;background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.06);cursor:pointer;font-size:14px;color:#333;border:none;width:calc(100% - 32px)}
+.vcard-btn:active{background:#f5f5f5}
+.vcard-btn svg{width:20px;height:20px}
+
+/* 地图 */
+.map-container{margin:8px 12px;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.06)}
+.map-container iframe{width:100%;height:200px;border:none}
+.map-address{padding:10px 14px;background:#fff;font-size:13px;color:#555;display:flex;align-items:center;gap:6px}
+.map-address a{color:#667eea;text-decoration:none;margin-left:auto;font-size:12px}
+
+/* 签名板 */
+.signature-pad{position:relative;border:2px dashed #ddd;border-radius:12px;margin:4px 0;background:#fafafa}
+.signature-pad canvas{width:100%;height:160px;display:block;border-radius:10px;touch-action:none}
+.signature-pad .sig-clear{position:absolute;top:8px;right:8px;padding:4px 10px;background:rgba(0,0,0,.5);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer}
+.signature-pad .sig-hint{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#ccc;font-size:13px;pointer-events:none}
+
+/* 文件上传 */
+.file-upload{border:2px dashed #ddd;border-radius:12px;padding:20px;text-align:center;cursor:pointer;background:#fafafa;transition:border-color .2s;margin:4px 0}
+.file-upload:active{border-color:#667eea;background:#f0f4ff}
+.file-upload .fu-icon{font-size:32px;margin-bottom:6px}
+.file-upload .fu-text{font-size:13px;color:#999}
+.file-upload .fu-preview{margin-top:10px;display:flex;flex-wrap:wrap;gap:8px}
+.file-upload .fu-file{display:flex;align-items:center;gap:4px;background:#e8f0fe;padding:4px 10px;border-radius:6px;font-size:12px;color:#1a73e8}
+.file-upload .fu-img{width:60px;height:60px;object-fit:cover;border-radius:8px}
+.file-upload .fu-remove{color:#e53e3e;cursor:pointer;margin-left:4px;font-size:14px}
+
+/* 多步骤表单 */
+.step-progress{display:flex;align-items:center;justify-content:center;padding:16px;gap:0}
+.step-dot{width:28px;height:28px;border-radius:50%;border:2px solid #ddd;display:flex;align-items:center;justify-content:center;font-size:12px;color:#999;background:#fff;flex-shrink:0}
+.step-dot.active{border-color:#667eea;color:#fff;background:#667eea}
+.step-dot.done{border-color:#52c41a;color:#fff;background:#52c41a}
+.step-line{flex:1;height:2px;background:#ddd;max-width:60px}
+.step-line.done{background:#52c41a}
+.step-content{display:none}
+.step-content.active{display:block}
+.step-nav{display:flex;gap:10px;padding:0 16px 16px}
+.step-nav button{flex:1;padding:10px;border:none;border-radius:8px;font-size:14px;cursor:pointer}
+.step-nav .step-prev{background:#f0f0f0;color:#666}
+.step-nav .step-next{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff}
+
+/* 名片模板 */
+.biz-card{max-width:400px;margin:12px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08)}
+.biz-header{padding:24px;text-align:center;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff}
+.biz-avatar{width:72px;height:72px;border-radius:50%;border:3px solid rgba(255,255,255,.5);margin:0 auto 12px;object-fit:cover;background:#fff}
+.biz-name{font-size:20px;font-weight:600}
+.biz-title{font-size:13px;opacity:.85;margin-top:4px}
+.biz-body{padding:16px}
+.biz-field{display:flex;align-items:center;padding:10px 0;border-bottom:1px solid #f0f0f0;font-size:14px}
+.biz-field:last-child{border-bottom:none}
+.biz-field .bf-icon{width:28px;color:#667eea;flex-shrink:0;font-size:16px}
+.biz-field .bf-label{color:#999;width:50px;flex-shrink:0;font-size:12px}
+.biz-field .bf-value{flex:1;color:#333;word-break:break-all}
+
+/* 产品展示 */
+.product-card{max-width:500px;margin:12px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08)}
+.product-gallery{position:relative}
+.product-gallery img{width:100%;display:block;max-height:60vh;object-fit:contain;background:#f5f5f5}
+.product-info{padding:16px}
+.product-price{font-size:24px;font-weight:700;color:#e53e3e}
+.product-price .original{font-size:14px;color:#999;text-decoration:line-through;font-weight:400;margin-left:8px}
+.product-name{font-size:16px;font-weight:500;margin:8px 0;color:#333}
+.product-desc{font-size:13px;color:#666;line-height:1.6}
+.product-actions{display:flex;gap:10px;padding:0 16px 16px}
+.product-actions button{flex:1;padding:12px;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer}
+.product-actions .buy-btn{background:linear-gradient(135deg,#ff6b6b,#ee5a24);color:#fff}
+.product-actions .contact-btn{background:#07c160;color:#fff}
+
+/* 活动邀请 */
+.event-card{max-width:500px;margin:12px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08)}
+.event-banner{width:100%;max-height:240px;object-fit:cover;display:block}
+.event-body{padding:16px}
+.event-title{font-size:20px;font-weight:700;color:#333;margin-bottom:8px}
+.event-meta{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.event-meta-item{display:flex;align-items:center;gap:8px;font-size:13px;color:#666}
+.event-meta-item .em-icon{color:#667eea;width:18px;text-align:center}
+.event-desc{font-size:14px;color:#555;line-height:1.6;margin-bottom:16px}
+.event-actions{display:flex;gap:10px}
+.event-actions button{flex:1;padding:12px;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer}
+.event-actions .rsvp-btn{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff}
+</style>
+</head>
+<body>
+<div id="app" class="loading">加载中...</div>
+
+<!-- 全屏查看容器 -->
+<div class="fullscreen" id="fullscreen" onclick="closeFullscreen(event)">
+  <div class="fs-close" onclick="closeFullscreen(event)">&times;</div>
+  <img id="fsImg" src="">
+  <div class="fs-counter" id="fsCounter"></div>
+</div>
+
+<script>
+(function() {
+  var params = new URLSearchParams(window.location.search);
+  var app = document.getElementById('app');
+
+  // COS base (for live config)
+  var COS_BASE = 'https://qr-create-1344352113.cos.ap-guangzhou.myqcloud.com';
+
+  // ============ 工具函数 ============
+  function detectType(url) {
+    var ext = url.split('.').pop().toLowerCase().split('?')[0].split('#')[0];
+    // 去掉可能的hash
+    ext = ext.split('#')[0];
+    if (['jpg','jpeg','png','gif','webp','bmp','svg','heic','heif'].indexOf(ext) > -1) return 'image';
+    if (['mp4','avi','mov','wmv','flv','mkv','webm','m4v','3gp'].indexOf(ext) > -1) return 'video';
+    if (['mp3','wav','aac','ogg','wma','flac','m4a','ape'].indexOf(ext) > -1) return 'audio';
+    if (ext === 'pdf') return 'pdf';
+    if (['doc','docx','xls','xlsx','ppt','pptx'].indexOf(ext) > -1) return 'office';
+    if (ext === 'html' || ext === 'htm') return 'html';
+    if (ext === 'json') return 'json';
+    return 'other';
+  }
+
+  function getFileName(url) {
+    try {
+      return decodeURIComponent(url.split('/').pop().split('?')[0].split('#')[0]);
+    } catch(e) {
+      return url.split('/').pop().split('?')[0];
+    }
+  }
+
+  function getFileSize(url) {
+    // 尝试从URL参数提取
+    var match = url.match(/[?&]size=(\d+)/);
+    if (match) {
+      var kb = parseInt(match[1]);
+      if (kb > 1024) return (kb / 1024).toFixed(1) + ' MB';
+      return kb + ' KB';
+    }
+    return '';
+  }
+
+  function escapeHtml(s) {
+    var d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  // ============ 音频播放控制 ============
+  function toggleAudioPlay(audioId) {
+    var audio = document.getElementById(audioId);
+    var btn = audio.parentElement.querySelector('.audio-play-btn');
+    var progressBar = audio.parentElement.querySelector('.audio-progress');
+    var progressBarFill = audio.parentElement.querySelector('.audio-progress-bar');
+    var timeDisplay = audio.parentElement.querySelector('.audio-time');
+    var playIcon = btn.querySelector('.play-icon');
+    var playText = btn.querySelector('.play-text');
+
+    if (audio.paused) {
+      audio.play().then(function() {
+        btn.classList.add('playing');
+        playIcon.innerHTML = '&#x23F8;';
+        playText.textContent = '暂停';
+        progressBar.style.display = 'block';
+        timeDisplay.style.display = 'block';
+      }).catch(function(e) {
+        // 播放失败（个别安卓微信X5内核限制）→ 降级为下载引导
+        btn.parentElement.innerHTML = audioFallbackHtml(audio.src);
+      });
+    } else {
+      audio.pause();
+      btn.classList.remove('playing');
+      playIcon.innerHTML = '&#x25B6;';
+      playText.textContent = '继续播放';
+    }
+
+    audio.ontimeupdate = function() {
+      if (audio.duration) {
+        var pct = (audio.currentTime / audio.duration) * 100;
+        progressBarFill.style.width = pct + '%';
+        var cur = formatTime(audio.currentTime);
+        var dur = formatTime(audio.duration);
+        timeDisplay.textContent = cur + ' / ' + dur;
+      }
+    };
+
+    audio.onended = function() {
+      btn.classList.remove('playing');
+      playIcon.innerHTML = '&#x25B6;';
+      playText.textContent = '重新播放';
+    };
+  }
+  window.toggleAudioPlay = toggleAudioPlay;
+
+  function formatTime(sec) {
+    var m = Math.floor(sec / 60);
+    var s = Math.floor(sec % 60);
+    return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+  }
+
+  // ============ 音频播放辅助 ============
+  // 安卓微信（X5内核）渲染不了原生audio标签，统一走下载引导；其它环境用自定义播放器
+  function isAndroidWeChatEnv() {
+    return /MicroMessenger/.test(navigator.userAgent) && /Android/.test(navigator.userAgent);
+  }
+
+  function audioPlayerHtml(url) {
+    var audioId = 'audio_' + Math.random().toString(36).substr(2, 9);
+    return '<audio id="' + audioId + '" src="' + url + '" preload="metadata"></audio>' +
+      '<div style="text-align:center">' +
+      '<button class="audio-play-btn" onclick="toggleAudioPlay(\'' + audioId + '\')">' +
+        '<span class="play-icon">&#x25B6;</span><span class="play-text">点击播放</span>' +
+      '</button>' +
+      '<div class="audio-progress" style="display:none"><div class="audio-progress-bar"></div></div>' +
+      '<div class="audio-time" style="display:none">00:00 / 00:00</div>' +
+      '</div>';
+  }
+
+  // 播放失败时（个别安卓微信X5内核限制）降级为下载引导
+  function audioFallbackHtml(url) {
+    return '<div style="padding:14px;background:#f8f9fa;border-radius:12px;text-align:center">' +
+      '<a href="' + url + '" download style="display:inline-block;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;padding:10px 24px;border-radius:22px;text-decoration:none;font-size:14px;box-shadow:0 4px 12px rgba(102,126,234,.35)">下载后播放</a>' +
+      '<div style="font-size:11px;color:#999;margin-top:8px">当前浏览器不支持在线播放，或复制链接到系统浏览器打开</div>' +
+      '</div>';
+  }
+
+  // ============ 全屏查看图片 ============
+  var fsImages = [];
+  var fsIndex = 0;
+  var fsColors = [];
+  var pageBg = ''; // 整页背景（全局色），点开放大时的兜底背景
+
+  // 颜色白名单：仅允许 #hex(3/4/6/8位) 或 rgba?(数字)。来自URL参数(?bg=/?colors=)的颜色
+  // 一律先过这里，不合法直接返回空串——堵死反射型XSS（S2/高-1）
+  var COLOR_RE = /^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$|^rgba?\(\s*[\d.]+%?\s*,\s*[\d.]+%?\s*,\s*[\d.]+%?\s*(?:,\s*[\d.]+\s*)?\)$/;
+  function safeColor(c) {
+    var s = String(c || '').trim();
+    return COLOR_RE.test(s) ? s : '';
+  }
+
+  // URL净化：仅 http(s) 协议，拒绝引号/尖括号/空格——堵死 ?url= 属性逃逸（S3）
+  function safeUrl(u) {
+    var s = String(u || '').trim();
+    if (!/^https?:\/\//i.test(s)) return '';
+    if (/["'<>\s]/.test(s)) return '';
+    return s;
+  }
+
+  // 颜色字符串 → CSS background 值（"a,b" = 渐变，"a" = 纯色）；非法色返回空
+  // 注意顺序：先整体验色（rgba(102,126,234) 自带逗号，不能先split），再试渐变
+  function colorCss(c) {
+    if (!c) return '';
+    var s = String(c);
+    var whole = safeColor(s);
+    if (whole) return whole;
+    var parts = s.split(',');
+    if (parts.length > 1 && parts[1] && parts[0] !== parts[1]) {
+      var ga = safeColor(parts[0]), gb2 = safeColor(parts[1]);
+      if (!ga || !gb2) return '';
+      return 'linear-gradient(135deg,' + ga + ',' + gb2 + ')';
+    }
+    return '';
+  }
+
+  // PDF 在线查看器（pdf.js，部署在仓库根目录 pdfjs/）
+  // 本页可能在仓库根（定制客户）或 v2/ 下（主仓库），动态算根路径
+  function pdfViewerUrl(u) {
+    var base = location.pathname.replace(/[^\/]*$/, ''); // 去掉 index.html
+    base = base.replace(/v2\/$/, ''); // v2/ 下回到仓库根
+    return base + 'pdfjs/web/viewer.html?file=' + encodeURIComponent(u) + '#zoom=page-width';
+  }
+
+  // 压平 pdf.js 查看器：隐藏工具栏/侧栏，页面按宽度铺满（同域 iframe，手机扫码体验）
+  // 同时注入缩放控件（＋/−/重置），浮动在 PDF 右下角
+  var _pdfZoomLevel = 1.0; // 当前缩放倍数（1.0 = page-width）
+  function setPdfZoom(delta) {
+    _pdfZoomLevel = Math.max(0.25, Math.min(5, _pdfZoomLevel + delta));
+    var iframes = document.querySelectorAll('iframe[src*="pdfjs/web/viewer.html"]');
+    iframes.forEach(function(ifr) {
+      try {
+        var w = ifr.contentWindow;
+        if (w && w.PDFViewerApplication && w.PDFViewerApplication.pdfViewer) {
+          w.PDFViewerApplication.pdfViewer.currentScale = _pdfZoomLevel;
+        }
+      } catch (e) {}
+    });
+    // 更新按钮状态
+    var zi = document.getElementById('pdfZoomIn');
+    var zo = document.getElementById('pdfZoomOut');
+    if (zi) zi.style.opacity = _pdfZoomLevel >= 5 ? '0.35' : '1';
+    if (zo) zo.style.opacity = _pdfZoomLevel <= 0.25 ? '0.35' : '1';
+    // 缩放后重新计算 autoHeight
+    setTimeout(function() {
+      iframes.forEach(function(ifr) {
+        if (ifr.dataset.autoh) {
+          try {
+            var d = ifr.contentDocument;
+            if (d) {
+              var vc = d.getElementById('viewerContainer');
+              if (vc && vc.scrollHeight > 100) {
+                ifr.style.height = vc.scrollHeight + 'px';
+              }
+            }
+          } catch (e) {}
+        }
+      });
+    }, 500);
+  }
+  function resetPdfZoom() {
+    _pdfZoomLevel = 1.0;
+    var iframes = document.querySelectorAll('iframe[src*="pdfjs/web/viewer.html"]');
+    iframes.forEach(function(ifr) {
+      try {
+        var w = ifr.contentWindow;
+        if (w && w.PDFViewerApplication && w.PDFViewerApplication.pdfViewer) {
+          w.PDFViewerApplication.pdfViewer.currentScaleValue = 'page-width';
+        }
+      } catch (e) {}
+    });
+    var zi = document.getElementById('pdfZoomIn');
+    var zo = document.getElementById('pdfZoomOut');
+    if (zi) zi.style.opacity = '1';
+    if (zo) zo.style.opacity = '1';
+    setTimeout(function() {
+      iframes.forEach(function(ifr) {
+        if (ifr.dataset.autoh) {
+          try {
+            var d = ifr.contentDocument;
+            if (d) {
+              var vc = d.getElementById('viewerContainer');
+              if (vc && vc.scrollHeight > 100) {
+                ifr.style.height = vc.scrollHeight + 'px';
+              }
+            }
+          } catch (e) {}
+        }
+      });
+    }, 500);
+  }
+  function injectPdfZoomControls() {
+    if (document.getElementById('pdfZoomBox')) return;
+    var box = document.createElement('div');
+    box.id = 'pdfZoomBox';
+    box.style.cssText = 'position:fixed;right:14px;bottom:80px;z-index:9999;display:flex;flex-direction:column;gap:6px;opacity:0.85;transition:opacity .2s';
+    box.onmouseenter = function() { box.style.opacity = '1'; };
+    box.onmouseleave = function() { box.style.opacity = '0.7'; };
+    var btnStyle = 'width:38px;height:38px;border-radius:50%;border:0;background:rgba(30,30,30,0.72);color:#fff;font-size:20px;font-weight:700;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);box-shadow:0 2px 8px rgba(0,0,0,.18);user-select:none;-webkit-tap-highlight-color:transparent;line-height:1;padding:0';
+    box.innerHTML = '<button id="pdfZoomIn" style="' + btnStyle + '" title="放大">+</button>' +
+      '<button id="pdfZoomOut" style="' + btnStyle + '" title="缩小">−</button>' +
+      '<button id="pdfZoomReset" style="' + btnStyle + ';font-size:13px;font-weight:600" title="适应宽度"></button>';
+    document.body.appendChild(box);
+    document.getElementById('pdfZoomIn').onclick = function() { setPdfZoom(0.25); };
+    document.getElementById('pdfZoomOut').onclick = function() { setPdfZoom(-0.25); };
+    document.getElementById('pdfZoomReset').onclick = function() { resetPdfZoom(); };
+  }
+
+  function flattenPdfFrames() {
+    var iframes = document.querySelectorAll('iframe[src*="pdfjs/web/viewer.html"]');
+    if (!iframes.length) return;
+    injectPdfZoomControls();
+    iframes.forEach(function(ifr) {
+      if (ifr.dataset.flat) return;
+      ifr.dataset.flat = '1';
+      ifr.addEventListener('load', function() {
+        try {
+          var w = ifr.contentWindow, d = ifr.contentDocument;
+          if (!d || !d.head) return;
+          var st = d.createElement('style');
+          st.textContent = '#toolbarContainer,#secondaryToolbar,#sidebarContainer,#sidebarResizer{display:none!important}' +
+            '#viewerContainer{top:0!important;left:0!important;background:#fff!important}' +
+            '#outerContainer{padding:0!important}' +
+            '.page{margin:0 auto 6px!important;border:none!important}';
+          d.head.appendChild(st);
+          var tryZoom = function(n) {
+            try {
+              var app = w.PDFViewerApplication;
+              if (app && app.pdfViewer && app.pdfViewer.pagesCount) {
+                app.pdfViewer.currentScaleValue = 'page-width';
+                if (ifr.dataset.autoh) autoHeight(10);
+              } else if (n > 0) { setTimeout(function() { tryZoom(n - 1); }, 300); }
+            } catch (e) {}
+          };
+          // 高度自适应：iframe 高度 = PDF 内容实际高度，不留白、不内滚，整页自然滑动
+          var autoHeight = function(n) {
+            try {
+              var vc = d.getElementById('viewerContainer');
+              if (vc) {
+                var h = vc.scrollHeight;
+                if (h > 100) {
+                  var box = ifr.parentElement;
+                  if (box && box.style.position === 'fixed') { box.style.position = 'static'; box.style.display = 'block'; box.style.minHeight = '100vh'; }
+                  ifr.style.flex = 'none';
+                  ifr.style.display = 'block';
+                  ifr.style.height = h + 'px';
+                }
+              }
+            } catch (e) {}
+            if (n > 0) setTimeout(function() { autoHeight(n - 1); }, 400);
+          };
+          tryZoom(15);
+        } catch (e) {}
+      });
+    });
+  }
+
+  function openFullscreen(imgEl, images, index, colors) {
+    fsImages = images || [imgEl.src];
+    fsIndex = index || 0;
+    fsColors = colors || [];
+    showFsImage();
+    document.getElementById('fullscreen').classList.add('show');
+  }
+
+  function showFsImage() {
+    document.getElementById('fsImg').src = fsImages[fsIndex];
+    // 点开放大的背景：该图自己的颜色 → 全局页面背景 → 默认深色
+    var fs = document.getElementById('fullscreen');
+    var c = fsColors[fsIndex] || pageBg;
+    fs.style.background = c ? colorCss(c) : '';
+    var counter = document.getElementById('fsCounter');
+    if (fsImages.length > 1) {
+      counter.textContent = (fsIndex + 1) + ' / ' + fsImages.length;
+      counter.style.display = '';
+    } else {
+      counter.style.display = 'none';
+    }
+  }
+
+  function closeFullscreen(e) {
+    if (e && e.target && e.target.tagName === 'IMG') return; // 点击图片不关闭
+    document.getElementById('fullscreen').classList.remove('show');
+  }
+  // 内联onclick需要全局可见（不导出的话点图放大是失效的）
+  window.openFullscreen = openFullscreen;
+  window.closeFullscreen = closeFullscreen;
+
+  // 支持左右滑动切换
+  var touchStartX = 0;
+  document.getElementById('fullscreen').addEventListener('touchstart', function(e) {
+    touchStartX = e.touches[0].clientX;
+  });
+  document.getElementById('fullscreen').addEventListener('touchend', function(e) {
+    var dx = e.changedTouches[0].clientX - touchStartX;
+    if (Math.abs(dx) > 50) {
+      if (dx < 0 && fsIndex < fsImages.length - 1) { fsIndex++; showFsImage(); }
+      else if (dx > 0 && fsIndex > 0) { fsIndex--; showFsImage(); }
+    }
+  });
+
+  // ============ 渲染器 ============
+  var Renderer = {
+    // 单图片
+    singleImage: function(url, title, bg) {
+      // 标题只进微信顶栏(document.title)，不压在图片上
+      return '<div class="single-image"' + (bg ? ' style="background:' + colorCss(bg) + '"' : '') + '><img src="' + url + '" onclick="openFullscreen(this)" alt=""></div>';
+    },
+
+    // 单视频
+    singleVideo: function(url, title) {
+      var h = '';
+      h += '<div class="single-video">';
+      h += '<video src="' + url + '" controls playsinline webkit-playsinline preload="metadata"></video>';
+      h += '</div>';
+      return h;
+    },
+
+    // 单音频
+    singleAudio: function(url, title) {
+      var name = title || getFileName(url);
+      return '<div class="single-audio"><div class="audio-card">' +
+        '<div class="audio-icon">&#x1F3B5;</div>' +
+        '<div class="audio-name">' + escapeHtml(name) + '</div>' +
+        audioPlayerHtml(url) +
+        '<a href="' + url + '" download style="display:block;margin-top:12px;font-size:13px;color:#667eea">下载音频</a>' +
+        '</div></div>';
+    },
+
+    // 单PDF
+    singlePdf: function(url, title, allowDl) {
+      // pdf.js 内嵌查看器：扫码直接看，不用下载
+      // 标题放微信顶栏(document.title)，不在PDF上方压一行大字
+      var h = '<div style="position:fixed;inset:0;display:flex;flex-direction:column;background:#fff">';
+      h += '<iframe src="' + pdfViewerUrl(url) + '" data-autoh="1" style="flex:1;width:100%;border:0"></iframe>';
+      // 下载按钮：客户可在生成时关闭（dl=0 则不显示）
+      if (allowDl !== false) h += '<div style="flex:none;text-align:center;padding:6px;font-size:12px;border-top:1px solid #eee"><a href="' + url + '" target="_blank" style="color:#667eea;text-decoration:none">下载 PDF 到本地</a></div>';
+      h += '</div>';
+      return h;
+    },
+
+    // 多图画廊（标题只进微信顶栏）
+    multiImage: function(items, title) {
+      var h = '';
+      var n = items.length;
+      var gc = n === 1 ? 'g-1' : n === 2 ? 'g-2' : n === 3 ? 'g-3' : n === 4 ? 'g-4' : 'g-many';
+      h += '<div class="gallery ' + gc + '">';
+      var urls = items.map(function(it) { return it.url; });
+      var colors = items.map(function(it) { return it.bgColor || ''; });
+      for (var i = 0; i < n; i++) {
+        var item = items[i];
+        var wrapBg = item.bgColor ? ' style="background:' + colorCss(item.bgColor) + '"' : '';
+        h += '<div class="img-wrap"' + wrapBg + ' onclick=\'openFullscreen(this.querySelector("img"),' + JSON.stringify(urls) + ',' + i + ',' + JSON.stringify(colors) + ')\'>';
+        h += '<img src="' + item.url + '" alt="">';
+        // caption等于文件名（自动生成的哈希名）时不显示，避免多余标题
+        if (item.caption && item.caption !== getFileName(item.url)) h += '<div class="img-caption">' + escapeHtml(item.caption) + '</div>';
+        h += '</div>';
+      }
+      h += '</div>';
+      return h;
+    },
+
+    // 多视频（标题只进微信顶栏）
+    multiVideo: function(items, title) {
+      var h = '';
+      h += '<div class="video-list">';
+      for (var i = 0; i < items.length; i++) {
+        h += '<div class="video-item">';
+        h += '<video src="' + items[i].url + '" controls preload="metadata" playsinline></video>';
+        if (items[i].caption) h += '<div class="video-label">' + escapeHtml(items[i].caption) + '</div>';
+        h += '</div>';
+      }
+      h += '</div>';
+      return h;
+    },
+
+    // 多音频（标题只进微信顶栏）
+    multiAudio: function(items, title) {
+      var h = '';
+      h += '<div class="audio-list">';
+      for (var i = 0; i < items.length; i++) {
+        h += '<div class="audio-item">';
+        if (items[i].caption || items[i].title) {
+          h += '<div class="audio-title">' + escapeHtml(items[i].caption || items[i].title) + '</div>';
+        }
+        h += audioPlayerHtml(items[i].url);
+        h += '</div>';
+      }
+      h += '</div>';
+      return h;
+    },
+
+    // 文档列表
+    docList: function(items, title) {
+      // 标题放微信顶栏(document.title)，不压在文档上
+      if (title) { try { document.title = title; } catch(e) {} }
+      var h = '';
+      h += '<div class="doc-list">';
+      for (var i = 0; i < items.length; i++) {
+        var item = items[i];
+        var ext = item.url.split('.').pop().toLowerCase().split('?')[0];
+        var iconClass = ext === 'pdf' ? 'pdf' : (['doc','docx','xls','xlsx','ppt','pptx'].indexOf(ext) > -1 ? 'doc' : 'other');
+        var icon = ext === 'pdf' ? '&#x1F4C4;' : '&#x1F4C3;';
+        // PDF直接打开，Office文件用Microsoft Online Viewer
+        var link;
+        if (ext === 'pdf') {
+          link = item.url;
+        } else {
+          link = 'https://view.officeapps.live.com/op/view.aspx?src=' + encodeURIComponent(item.url);
+        }
+        h += '<a class="doc-item" href="' + link + '" target="_blank">';
+        h += '<div class="doc-icon ' + iconClass + '">' + icon + '</div>';
+        h += '<div class="doc-name">' + escapeHtml(item.caption || getFileName(item.url)) + '</div>';
+        h += '<div class="doc-arrow">&#x203A;</div>';
+        h += '</a>';
+      }
+      h += '</div>';
+      return h;
+    },
+
+    // 文字块
+    textBlock: function(item) {
+      var style = item.style || {};
+      var cls = 'text-block';
+      var pStyle = '';
+      if (style.fontSize) pStyle += 'font-size:' + style.fontSize + 'px;';
+      if (style.color) pStyle += 'color:' + style.color + ';';
+      if (style.bold || style.fontWeight === 'bold') cls += ' text-bold';
+      var align = style.textAlign || 'left';
+      cls += ' text-' + align;
+      return '<div class="text-block"><p style="' + pStyle + '" class="' + cls.replace('text-block ','') + '">' + escapeHtml(item.content || item.text || '') + '</p></div>';
+    },
+
+    // 表单
+    formBlock: function(item) {
+      var fields = item.fields || [];
+      var h = '<div class="form-section"><div class="form-card">';
+      if (item.title) h += '<h3>' + escapeHtml(item.title) + '</h3>';
+      h += '<form id="qrForm" onsubmit="return false">';
+      for (var i = 0; i < fields.length; i++) {
+        var f = fields[i];
+        var ftype = f.type || 'text';
+        h += '<div class="form-field">';
+        h += '<label>' + escapeHtml(f.label) + (f.required ? ' *' : '') + '</label>';
+        if (ftype === 'textarea') {
+          h += '<textarea name="' + escapeHtml(f.label) + '" placeholder="' + escapeHtml(f.placeholder || '请输入' + f.label) + '"' + (f.required ? ' required' : '') + '></textarea>';
+        } else if (ftype === 'select' && f.options) {
+          h += '<select name="' + escapeHtml(f.label) + '"' + (f.required ? ' required' : '') + '>';
+          h += '<option value="">请选择</option>';
+          for (var j = 0; j < f.options.length; j++) {
+            h += '<option value="' + escapeHtml(f.options[j]) + '">' + escapeHtml(f.options[j]) + '</option>';
+          }
+          h += '</select>';
+        } else {
+          h += '<input type="' + ftype + '" name="' + escapeHtml(f.label) + '" placeholder="' + escapeHtml(f.placeholder || '请输入' + f.label) + '"' + (f.required ? ' required' : '') + '>';
+        }
+        h += '</div>';
+      }
+      h += '<button type="button" class="form-submit" onclick="submitQRForm()">提交</button>';
+      h += '</form>';
+      h += '<div class="form-success" id="formSuccess" style="display:none">提交成功!</div>';
+      h += '</div></div>';
+      return h;
+    }
+  };
+
+  // 表单收集已下架（制作端不再提供表单模块），存量码如实提示，不做假成功
+  window.submitQRForm = function() {
+    alert('该表单的收集功能已暂停，填写内容不会被保存，请直接联系发布者');
+  };
+
+  // ============ 多步骤表单导航（状态从DOM推导，不依赖注入的script——innerHTML里的script不执行） ============
+  function _formStepState() {
+    var contents = document.querySelectorAll('.step-content');
+    var cur = 0;
+    for (var i = 0; i < contents.length; i++) { if (contents[i].classList.contains('active')) { cur = i; break; } }
+    return { cur: cur, total: contents.length };
+  };
+
+  window.formStepNext = function() {
+    var st = _formStepState();
+    if (!st.total) return;
+    var currentStep = st.cur, totalSteps = st.total;
+    // 验证当前步骤的必填字段
+    var currentContent = document.getElementById('stepContent' + currentStep);
+    var requiredInputs = currentContent.querySelectorAll('[required]');
+    for (var i = 0; i < requiredInputs.length; i++) {
+      if (!requiredInputs[i].value.trim()) {
+        requiredInputs[i].style.borderColor = '#ff4444';
+        requiredInputs[i].focus();
+        alert('请填写所有必填项');
+        return;
+      }
+    }
+    // 最后一步 = 提交
+    if (currentStep === totalSteps - 1) { submitQRForm(); return; }
+    // 隐藏当前步骤
+    document.getElementById('stepContent' + currentStep).classList.remove('active');
+    document.getElementById('stepDot' + currentStep).classList.remove('active');
+    document.getElementById('stepDot' + currentStep).classList.add('done');
+    document.getElementById('stepLine' + (currentStep + 1)).classList.add('done');
+    currentStep++;
+    // 显示下一步骤
+    document.getElementById('stepContent' + currentStep).classList.add('active');
+    document.getElementById('stepDot' + currentStep).classList.add('active');
+    // 更新按钮状态
+    document.getElementById('stepPrev').style.display = '';
+    if (currentStep === totalSteps - 1) {
+      document.getElementById('stepNext').textContent = '提交';
+    }
+    // 触发条件显示检查
+    checkConditionalFields();
+  };
+
+  window.formStepPrev = function() {
+    var st = _formStepState();
+    if (!st.total) return;
+    var currentStep = st.cur, totalSteps = st.total;
+    if (currentStep === 0) return;
+    document.getElementById('stepContent' + currentStep).classList.remove('active');
+    document.getElementById('stepDot' + currentStep).classList.remove('active');
+    currentStep--;
+    document.getElementById('stepContent' + currentStep).classList.add('active');
+    document.getElementById('stepDot' + currentStep).classList.add('active');
+    document.getElementById('stepDot' + currentStep).classList.remove('done');
+    if (currentStep < totalSteps - 1) {
+      document.getElementById('stepLine' + (currentStep + 1)).classList.remove('done');
+    }
+    document.getElementById('stepNext').textContent = '下一步';
+    if (currentStep === 0) {
+      document.getElementById('stepPrev').style.display = 'none';
+    }
+  };
+
+  // ============ 条件显示检查 ============
+  function checkConditionalFields() {
+    var form = document.getElementById('qrForm');
+    if (!form) return;
+    var conditionalFields = form.querySelectorAll('[data-show-if-field]');
+    for (var i = 0; i < conditionalFields.length; i++) {
+      var el = conditionalFields[i];
+      var fieldName = el.getAttribute('data-show-if-field');
+      var fieldValue = el.getAttribute('data-show-if-value');
+      var input = form.querySelector('[name="' + fieldName + '"]');
+      if (input && input.value === fieldValue) {
+        el.style.display = '';
+      } else if (input) {
+        el.style.display = 'none';
+      }
+    }
+  }
+
+  // 监听表单输入变化，触发条件显示
+  document.addEventListener('change', function(e) {
+    if (e.target.closest('#qrForm')) {
+      checkConditionalFields();
+    }
+  });
+  document.addEventListener('input', function(e) {
+    if (e.target.closest('#qrForm')) {
+      checkConditionalFields();
+    }
+  });
+
+  // ============ Manifest 渲染（多类型混合，支持完整排版样式） ============
+  function applyItemStyle(el, item) {
+    // 通用item样式：背景色、边距、圆角等
+    if (item.bgColor || item.backgroundColor) {
+      el.style.background = item.bgColor || item.backgroundColor;
+    }
+    if (item.margin) el.style.margin = item.margin;
+    if (item.padding) el.style.padding = item.padding;
+    if (item.borderRadius) el.style.borderRadius = item.borderRadius + 'px';
+  }
+
+  function applyTextStyle(el, style) {
+    if (!style) return;
+    if (style.fontSize) el.style.fontSize = style.fontSize + 'px';
+    if (style.fontFamily) el.style.fontFamily = style.fontFamily;
+    if (style.color) el.style.color = style.color;
+    if (style.bold || style.fontWeight === 'bold' || style.fontWeight === 600 || style.fontWeight === '700') el.style.fontWeight = '600';
+    if (style.italic || style.fontStyle === 'italic') el.style.fontStyle = 'italic';
+    if (style.textAlign) el.style.textAlign = style.textAlign;
+    if (style.lineHeight) el.style.lineHeight = style.lineHeight;
+    if (style.letterSpacing) el.style.letterSpacing = style.letterSpacing + 'px';
+    if (style.textDecoration) el.style.textDecoration = style.textDecoration;
+  }
+
+  function renderManifest(data) {
+    var h = '';
+    var title = data.title || '';
+    // 微信顶栏同步显示标题
+    if (title) { try { document.title = title; } catch(e) {} }
+    var titleStyle = data.titleStyle || {};
+    var bg = data.bg || data.backgroundColor || '#f5f7fa';
+    var bgCss = colorCss(bg);
+    if (bgCss) document.body.style.background = bgCss;
+    pageBg = bgCss || '#f5f7fa';
+
+    // 标题渲染（支持样式）
+    // 纯媒体/文档内容（全是图片/视频/音频/PDF/Office）不在页面上压标题——标题已在微信顶栏
+    var allDocs = data.items && data.items.length > 0 && data.items.every(function(it) {
+      return it.type === 'pdf' || it.type === 'office' || it.type === 'image' || it.type === 'video' || it.type === 'audio';
+    });
+    if (title && !allDocs) {
+      var ts = 'text-align:' + (titleStyle.textAlign || 'center') + ';padding:20px 16px 8px;word-break:break-word;';
+      if (titleStyle.fontSize) ts += 'font-size:' + titleStyle.fontSize + 'px;';
+      else ts += 'font-size:20px;';
+      if (titleStyle.color) ts += 'color:' + titleStyle.color + ';';
+      else ts += 'color:#222;';
+      if (titleStyle.bold || titleStyle.fontWeight) ts += 'font-weight:600;';
+      if (titleStyle.fontFamily) ts += 'font-family:' + titleStyle.fontFamily + ';';
+      if (titleStyle.bgColor) ts += 'background:' + titleStyle.bgColor + ';padding:16px;';
+      h += '<div style="' + ts + '">' + escapeHtml(title) + '</div>';
+    }
+    if (data.subtitle) {
+      var subStyle = 'text-align:center;padding:0 16px 16px;font-size:13px;color:#999;';
+      if (data.subtitleStyle && data.subtitleStyle.color) subStyle = subStyle.replace('#999', data.subtitleStyle.color);
+      h += '<div style="' + subStyle + '">' + escapeHtml(data.subtitle) + '</div>';
+    }
+
+    // 图片布局模式：gallery(网格) 或 list(列表)
+    var imageLayout = data.imageLayout || 'gallery'; // gallery / list / slider
+    var galleryCols = data.galleryCols; // 自动/2/3/4
+    var imageItems = [];
+    var nonImageBuffer = []; // 非图片item暂存
+
+    function flushNonImageItems() {
+      // 渲染暂存的非图片items
+      for (var j = 0; j < nonImageBuffer.length; j++) {
+        h += nonImageBuffer[j];
+      }
+      nonImageBuffer = [];
+    }
+
+    var items = data.items || [];
+
+    // 第一遍：收集连续图片用于gallery布局
+    for (var i = 0; i < items.length; i++) {
+      var item = items[i];
+      var type = item.type || 'text';
+
+      if (type === 'image') {
+        imageItems.push(item);
+        // 如果下一个不是图片，或者这是最后一个，就渲染gallery
+        var nextIsImage = (i < items.length - 1) && (items[i+1].type === 'image');
+        if (!nextIsImage && imageItems.length > 0) {
+          // 先渲染之前积累的非图片items
+          flushNonImageItems();
+          // 渲染图片gallery
+          h += renderImageGallery(imageItems, galleryCols, imageLayout);
+          imageItems = [];
+        }
+      }
+      else if (type === 'video') {
+        var vh = '<div class="video-list" style="padding-bottom:8px">';
+        vh += '<div class="video-item" style="border-radius:' + (item.borderRadius || 12) + 'px;overflow:hidden">';
+        vh += '<video src="' + item.url + '" controls preload="metadata" playsinline style="width:100%;display:block;max-height:70vh"></video>';
+        if (item.caption) vh += '<div class="video-label">' + escapeHtml(item.caption) + '</div>';
+        vh += '</div></div>';
+        nonImageBuffer.push(vh);
+      }
+      else if (type === 'audio') {
+        var ah = '<div class="audio-list" style="padding-bottom:8px">';
+        ah += '<div class="audio-item" style="border-radius:' + (item.borderRadius || 14) + 'px">';
+        if (item.caption || item.title) ah += '<div class="audio-title">' + escapeHtml(item.caption || item.title) + '</div>';
+        ah += audioPlayerHtml(item.url);
+        ah += '</div></div>';
+        nonImageBuffer.push(ah);
+      }
+      else if (type === 'pdf') {
+        var ph = '<div style="padding:0 12px 12px">';
+        if (item.caption) ph += '<div style="font-size:14px;font-weight:600;color:#333;padding:2px 2px 8px">' + escapeHtml(item.caption) + '</div>';
+        ph += '<div style="border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08);background:#fff">';
+        ph += '<iframe src="' + pdfViewerUrl(item.url) + '" data-autoh="1" style="width:100%;height:65vh;border:0;display:block"></iframe>';
+        if (item.dl !== false) ph += '<a href="' + item.url + '" target="_blank" style="display:block;text-align:center;padding:8px;font-size:12px;color:#667eea;text-decoration:none;border-top:1px solid #f0f0f0">下载 PDF 到本地</a>';
+        ph += '</div></div>';
+        nonImageBuffer.push(ph);
+      }
+      else if (type === 'office') {
+        var officeLink = 'https://view.officeapps.live.com/op/view.aspx?src=' + encodeURIComponent(item.url);
+        var oh = '<div class="doc-list" style="padding-bottom:8px">';
+        oh += '<a class="doc-item" href="' + officeLink + '" target="_blank" style="border-radius:' + (item.borderRadius || 12) + 'px">';
+        oh += '<div class="doc-icon doc">&#x1F4C3;</div>';
+        oh += '<div class="doc-name">' + escapeHtml(item.caption || getFileName(item.url)) + '</div>';
+        oh += '<div class="doc-arrow">&#x203A;</div></a></div>';
+        nonImageBuffer.push(oh);
+      }
+      else if (type === 'text') {
+        var th = renderTextBlock(item);
+        nonImageBuffer.push(th);
+      }
+      else if (type === 'kv') {
+        nonImageBuffer.push(renderKvBlock(item));
+      }
+      else if (type === 'form') {
+        var fh = renderFormBlock(item);
+        nonImageBuffer.push(fh);
+        // 加载html2canvas用于表单截图提交
+        if (!document.querySelector('script[src*="html2canvas"]')) {
+          var s = document.createElement('script');
+          s.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+          document.head.appendChild(s);
+        }
+      }
+      else if (type === 'divider') {
+        nonImageBuffer.push('<div class="section-divider"></div>');
+      }
+      else if (type === 'spacer') {
+        var spacerH = item.height || 16;
+        nonImageBuffer.push('<div style="height:' + spacerH + 'px"></div>');
+      }
+      // ============ 新组件类型 ============
+      else if (type === 'countdown') {
+        nonImageBuffer.push(renderCountdown(item));
+      }
+      else if (type === 'viewCount') {
+        nonImageBuffer.push(renderViewCount(item));
+      }
+      else if (type === 'vcard') {
+        nonImageBuffer.push(renderVCard(item));
+      }
+      else if (type === 'map') {
+        nonImageBuffer.push(renderMap(item));
+      }
+      else if (type === 'product') {
+        nonImageBuffer.push(renderProduct(item));
+      }
+      else if (type === 'event') {
+        nonImageBuffer.push(renderEvent(item));
+      }
+      else if (type === 'bizcard') {
+        nonImageBuffer.push(renderBizCard(item));
+      }
+    }
+
+    // 循环结束，冲刷剩余的非图片items（否则图片后面的视频/音频/表单等会丢失）
+    flushNonImageItems();
+
+    app.innerHTML = h;
+    app.className = '';
+    flattenPdfFrames();
+  }
+
+  // 渲染图片gallery（支持网格/列表/轮播）
+  function renderImageGallery(imageItems, cols, layout) {
+    var n = imageItems.length;
+    if (n === 0) return '';
+
+    // 自动列数
+    if (!cols) {
+      if (n === 1) cols = 1;
+      else if (n === 2) cols = 1; // 2图上下排列
+      else if (n === 3) cols = 3;
+      else if (n === 4) cols = 2;
+      else cols = 3;
+    }
+
+    var urls = imageItems.map(function(it) { return it.url; });
+    var colors = imageItems.map(function(it) { return it.bgColor || ''; });
+    var h = '';
+
+    if (layout === 'list' || cols === 1) {
+      // 列表模式：每张图占满宽度
+      for (var i = 0; i < n; i++) {
+        var item = imageItems[i];
+        var wrapBg = item.bgColor ? 'background:' + colorCss(item.bgColor) + ';' : '';
+        h += '<div style="padding:0 12px 8px;max-width:700px;margin:0 auto">';
+        h += '<div style="border-radius:' + (item.borderRadius || 12) + 'px;overflow:hidden;cursor:pointer;' + wrapBg + '" onclick=\'openFullscreen(this.querySelector("img"),' + JSON.stringify(urls) + ',' + i + ',' + JSON.stringify(colors) + ')\'>';
+        h += '<img src="' + item.url + '" style="width:100%;display:block">';
+        h += '</div>';
+        if (item.caption && item.caption !== getFileName(item.url)) h += '<div class="img-caption">' + escapeHtml(item.caption) + '</div>';
+        h += '</div>';
+      }
+    } else {
+      // 网格模式
+      var gc = 'g-' + (n === 1 ? '1' : n === 2 ? '2' : n === 3 ? '3' : n === 4 ? '4' : 'many');
+      if (cols === 2 && n > 4) gc = 'g-many';
+      if (cols === 4 && n > 4) gc = 'g-many';
+      h += '<div class="gallery ' + gc + '" style="grid-template-columns:repeat(' + cols + ',1fr)">';
+      for (var i = 0; i < n; i++) {
+        var item = imageItems[i];
+        var wrapBg = item.bgColor ? 'background:' + colorCss(item.bgColor) + ';' : '';
+        h += '<div class="img-wrap" style="border-radius:' + (item.borderRadius || 12) + 'px;' + wrapBg + '" onclick=\'openFullscreen(this.querySelector("img"),' + JSON.stringify(urls) + ',' + i + ',' + JSON.stringify(colors) + ')\'>';
+        h += '<img src="' + item.url + '" alt="">';
+        if (item.caption && item.caption !== getFileName(item.url)) h += '<div class="img-caption">' + escapeHtml(item.caption) + '</div>';
+        h += '</div>';
+      }
+      h += '</div>';
+    }
+    return h;
+  }
+
+  // 渲染文字块（支持完整样式）
+  function renderTextBlock(item) {
+    var style = item.style || {};
+    var pStyle = '';
+    if (style.fontSize) pStyle += 'font-size:' + style.fontSize + 'px;';
+    else pStyle += 'font-size:15px;';
+    if (style.color) pStyle += 'color:' + style.color + ';';
+    else pStyle += 'color:#444;';
+    if (style.fontFamily) pStyle += 'font-family:' + style.fontFamily + ';';
+    if (style.bold || style.fontWeight) pStyle += 'font-weight:600;';
+    if (style.italic) pStyle += 'font-style:italic;';
+    if (style.lineHeight) pStyle += 'line-height:' + style.lineHeight + ';';
+    else pStyle += 'line-height:1.7;';
+    if (style.letterSpacing) pStyle += 'letter-spacing:' + style.letterSpacing + 'px;';
+    if (style.textDecoration) pStyle += 'text-decoration:' + style.textDecoration + ';';
+    var align = style.textAlign || 'left';
+    pStyle += 'text-align:' + align + ';';
+
+    var wrapStyle = 'padding:8px 20px;max-width:700px;margin:0 auto;';
+    if (item.bgColor) wrapStyle += 'background:' + item.bgColor + ';border-radius:8px;margin:4px 12px;padding:12px 16px;';
+
+    var content = item.content || item.text || '';
+    // 支持换行符
+    content = escapeHtml(content).replace(/\n/g, '<br>');
+
+    return '<div style="' + wrapStyle + '"><p style="' + pStyle + ';white-space:pre-wrap;word-break:break-word;margin:0">' + content + '</p></div>';
+  }
+
+  // 渲染信息行（名称灰小字 + 内容粗体，检测报告样式）
+  function renderKvBlock(item) {
+    var rows = item.rows || [];
+    var h = '<div style="max-width:700px;margin:0 auto;padding:0 16px 12px">';
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      h += '<div style="padding:10px 0;border-bottom:1px solid #eee">';
+      h += '<div style="font-size:13px;color:#999;margin-bottom:4px">' + escapeHtml(r.k || '') + '</div>';
+      h += '<div style="font-size:17px;font-weight:600;color:#222;word-break:break-word">' + escapeHtml(r.v || '') + '</div>';
+      h += '</div>';
+    }
+    h += '</div>';
+    return h;
+  }
+
+  // 渲染表单块
+  function renderFormBlock(item) {
+    var fields = item.fields || [];
+    var steps = item.steps || null; // 多步骤表单
+    var formStyle = item.style || {};
+    var h = '<div class="form-section"><div class="form-card" style="border-radius:' + (item.borderRadius || 14) + 'px">';
+    if (item.title) {
+      var titleSty = 'font-size:16px;font-weight:600;margin-bottom:14px;color:#333;';
+      if (item.titleStyle) {
+        if (item.titleStyle.fontSize) titleSty = 'font-size:' + item.titleStyle.fontSize + 'px;' + titleSty.substring(titleSty.indexOf(';') + 1);
+        if (item.titleStyle.color) titleSty = titleSty.replace('#333', item.titleStyle.color);
+      }
+      h += '<h3 style="' + titleSty + '">' + escapeHtml(item.title) + '</h3>';
+    }
+
+    // 多步骤表单
+    if (steps && steps.length > 1) {
+      h += '<div class="step-progress">';
+      for (var s = 0; s < steps.length; s++) {
+        if (s > 0) h += '<div class="step-line" id="stepLine' + s + '"></div>';
+        h += '<div class="step-dot' + (s === 0 ? ' active' : '') + '" id="stepDot' + s + '">' + (s + 1) + '</div>';
+      }
+      h += '</div>';
+      h += '<form id="qrForm" onsubmit="return false">';
+      for (var s = 0; s < steps.length; s++) {
+        h += '<div class="step-content' + (s === 0 ? ' active' : '') + '" id="stepContent' + s + '">';
+        if (steps[s].title) h += '<div style="font-size:14px;font-weight:600;color:#555;margin-bottom:10px">' + escapeHtml(steps[s].title) + '</div>';
+        var stepFields = steps[s].fields || [];
+        for (var i = 0; i < stepFields.length; i++) {
+          h += renderFormField(stepFields[i]);
+        }
+        h += '</div>';
+      }
+      h += '</form>';
+      h += '<div class="step-nav">';
+      h += '<button class="step-prev" id="stepPrev" onclick="formStepPrev()" style="display:none">上一步</button>';
+      h += '<button class="step-next" id="stepNext" onclick="formStepNext()">下一步</button>';
+      h += '</div>';
+      h += '<div class="form-success" id="formSuccess" style="display:none">提交成功!</div>';
+    } else {
+      // 普通单步表单
+      h += '<form id="qrForm" onsubmit="return false">';
+      for (var i = 0; i < fields.length; i++) {
+        h += renderFormField(fields[i]);
+      }
+      h += '</form>';
+      var btnStyle = 'background:linear-gradient(135deg,#667eea,#764ba2)';
+      if (item.submitColor) btnStyle = 'background:' + item.submitColor;
+      h += '<button type="button" class="form-submit" style="' + btnStyle + '" onclick="submitQRForm()">提交</button>';
+      h += '<div class="form-success" id="formSuccess" style="display:none">提交成功!</div>';
+    }
+
+    h += '</div></div>';
+    return h;
+  }
+
+  // 渲染单个表单字段（提取为独立函数，供多步骤复用）
+  function renderFormField(f) {
+    var ftype = f.type || 'text';
+    // 静态文字（说明文字，不是输入项）
+    if (ftype === 'note') {
+      var nst = f.style || {};
+      var np = 'font-size:' + (nst.fontSize || 14) + 'px;color:' + (nst.color || '#555') + ';line-height:1.7;margin:0;white-space:pre-wrap;word-break:break-word;';
+      if (nst.fontFamily) np += 'font-family:' + nst.fontFamily + ';';
+      return '<div class="form-field"><p style="' + np + '">' + escapeHtml(f.label || '').replace(/\n/g, '<br>') + '</p></div>';
+    }
+    // 单行输入类：标签和输入框同一行（如：姓名：____）
+    var SIMPLE = {text:1, tel:1, number:1, date:1, datetime:1, time:1, email:1, url:1};
+    if (SIMPLE[ftype] || (!f.options && ['textarea','select','radio','checkbox','rating','signature','file','image','cascader'].indexOf(ftype) < 0)) {
+      var sh = '<div class="form-field hrow"';
+      if (f.showIf) {
+        sh += ' data-show-if-field="' + escapeHtml(f.showIf.field) + '" data-show-if-value="' + escapeHtml(f.showIf.value) + '" style="display:none"';
+      }
+      sh += '>';
+      sh += '<label>' + escapeHtml(f.label) + (f.required ? ' *' : '') + '：</label>';
+      sh += '<input type="' + ftype + '" name="' + escapeHtml(f.label) + '" placeholder="' + escapeHtml(f.placeholder || '请输入') + '"' + (f.required ? ' required' : '') + '>';
+      sh += '</div>';
+      return sh;
+    }
+    var h = '<div class="form-field"';
+    // 条件显示
+    if (f.showIf) {
+      h += ' data-show-if-field="' + escapeHtml(f.showIf.field) + '" data-show-if-value="' + escapeHtml(f.showIf.value) + '" style="display:none"';
+    }
+    h += '>';
+    h += '<label>' + escapeHtml(f.label) + (f.required ? ' *' : '') + '</label>';
+      if (ftype === 'textarea') {
+        h += '<textarea name="' + escapeHtml(f.label) + '" placeholder="' + escapeHtml(f.placeholder || '请输入' + f.label) + '"' + (f.required ? ' required' : '') + '></textarea>';
+      } else if (ftype === 'select' && f.options) {
+        h += '<select name="' + escapeHtml(f.label) + '"' + (f.required ? ' required' : '') + '>';
+        h += '<option value="">请选择</option>';
+        for (var j = 0; j < f.options.length; j++) {
+          h += '<option value="' + escapeHtml(f.options[j]) + '">' + escapeHtml(f.options[j]) + '</option>';
+        }
+        h += '</select>';
+      } else if (ftype === 'radio' && f.options) {
+        for (var j = 0; j < f.options.length; j++) {
+          h += '<label style="display:inline-flex;align-items:center;margin-right:16px;font-weight:normal;cursor:pointer">';
+          h += '<input type="radio" name="' + escapeHtml(f.label) + '" value="' + escapeHtml(f.options[j]) + '" style="margin-right:4px;width:auto">';
+          h += escapeHtml(f.options[j]) + '</label>';
+        }
+      } else if (ftype === 'checkbox' && f.options) {
+        for (var j = 0; j < f.options.length; j++) {
+          h += '<label style="display:inline-flex;align-items:center;margin-right:16px;font-weight:normal;cursor:pointer">';
+          h += '<input type="checkbox" name="' + escapeHtml(f.label) + '[]" value="' + escapeHtml(f.options[j]) + '" style="margin-right:4px;width:auto">';
+          h += escapeHtml(f.options[j]) + '</label>';
+        }
+      } else if (ftype === 'rating') {
+        h += renderRatingField(f.label, f);
+      } else if (ftype === 'signature') {
+        h += renderSignatureField(f.label, f);
+        // 延迟初始化签名板
+        setTimeout(function() { initSignaturePad('sig_' + f.label); }, 200);
+      } else if (ftype === 'file' || ftype === 'image') {
+        var accept = ftype === 'image' ? 'image/*' : (f.accept || '*/*');
+        h += renderFileField(f.label, {accept: accept, multiple: f.multiple, maxFiles: f.maxFiles, hint: f.hint || (ftype === 'image' ? '图片' : '文件')});
+      } else if (ftype === 'date') {
+        h += '<input type="date" name="' + escapeHtml(f.label) + '"' + (f.required ? ' required' : '') + '>';
+      } else if (ftype === 'datetime') {
+        h += '<input type="datetime-local" name="' + escapeHtml(f.label) + '"' + (f.required ? ' required' : '') + '>';
+      } else if (ftype === 'time') {
+        h += '<input type="time" name="' + escapeHtml(f.label) + '"' + (f.required ? ' required' : '') + '>';
+      } else if (ftype === 'cascader' && f.options) {
+        // 省市区联动（简化版：三级select）
+        h += '<div class="cascader-group" style="display:flex;gap:6px">';
+        var levels = f.options; // [[省...], [市...], [区...]] 或嵌套结构
+        if (Array.isArray(levels) && levels.length === 3) {
+          for (var lv = 0; lv < 3; lv++) {
+            h += '<select name="' + escapeHtml(f.label) + '_' + lv + '" style="flex:1;padding:8px;font-size:13px">';
+            h += '<option value="">请选择</option>';
+            var opts = Array.isArray(levels[lv]) ? levels[lv] : [];
+            for (var j = 0; j < opts.length; j++) {
+              h += '<option value="' + escapeHtml(opts[j]) + '">' + escapeHtml(opts[j]) + '</option>';
+            }
+            h += '</select>';
+          }
+        }
+        h += '</div>';
+      } else {
+        h += '<input type="' + ftype + '" name="' + escapeHtml(f.label) + '" placeholder="' + escapeHtml(f.placeholder || '请输入' + f.label) + '"' + (f.required ? ' required' : '') + '>';
+      }
+      h += '</div>';
+    return h;
+  }
+
+  // ============ 增强表单字段渲染（在renderFormBlock里调用） ============
+  // 这些函数增强 renderFormBlock 里的字段类型
+
+  function renderRatingField(fieldName, field) {
+    var mode = field.ratingMode || 'star'; // star / num
+    var max = field.max || 5;
+    var h = '<div class="rating" data-field="' + escapeHtml(fieldName) + '" data-max="' + max + '">';
+    if (mode === 'star') {
+      for (var i = 1; i <= max; i++) {
+        h += '<span class="star" data-val="' + i + '" onclick="setRating(this)">&#9733;</span>';
+      }
+    } else {
+      h += '<div class="num-rating">';
+      for (var i = 1; i <= max; i++) {
+        h += '<div class="num-btn" data-val="' + i + '" onclick="setNumRating(this)">' + i + '</div>';
+      }
+      h += '</div>';
+    }
+    h += '<input type="hidden" name="' + escapeHtml(fieldName) + '" value="">';
+    h += '</div>';
+    return h;
+  }
+
+  function renderSignatureField(fieldName, field) {
+    var h = '<div class="signature-pad" data-field="' + escapeHtml(fieldName) + '">';
+    h += '<canvas id="sig_' + fieldName + '"></canvas>';
+    h += '<button type="button" class="sig-clear" onclick="clearSignature(this)">清除</button>';
+    h += '<div class="sig-hint">请在此签名</div>';
+    h += '<input type="hidden" name="' + escapeHtml(fieldName) + '" value="">';
+    h += '</div>';
+    return h;
+  }
+
+  function renderFileField(fieldName, field) {
+    var accept = field.accept || '*/*';
+    var multiple = field.multiple ? ' multiple' : '';
+    var maxFiles = field.maxFiles || 9;
+    var h = '<div class="file-upload" data-field="' + escapeHtml(fieldName) + '" data-max="' + maxFiles + '" onclick="triggerFileUpload(this)">';
+    h += '<div class="fu-icon">&#x1F4CE;</div>';
+    h += '<div class="fu-text">点击上传' + (field.hint || '文件') + '</div>';
+    h += '<div class="fu-preview" id="fup_' + fieldName + '"></div>';
+    h += '<input type="file" accept="' + accept + '"' + multiple + ' style="display:none" onchange="handleFileSelect(this)">';
+    h += '<input type="hidden" name="' + escapeHtml(fieldName) + '" value="">';
+    h += '</div>';
+    return h;
+  }
+
+  // 评分交互
+  window.setRating = function(el) {
+    var container = el.parentElement;
+    var val = parseInt(el.getAttribute('data-val'));
+    var stars = container.querySelectorAll('.star');
+    for (var i = 0; i < stars.length; i++) {
+      stars[i].classList.toggle('active', i < val);
+    }
+    container.querySelector('input[type=hidden]').value = val;
+  };
+
+  window.setNumRating = function(el) {
+    var container = el.parentElement.parentElement;
+    var val = el.getAttribute('data-val');
+    var btns = container.querySelectorAll('.num-btn');
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].classList.toggle('active', btns[i].getAttribute('data-val') === val);
+    }
+    container.querySelector('input[type=hidden]').value = val;
+  };
+
+  // 签名板
+  var sigCanvases = {};
+  window.initSignaturePad = function(canvasId) {
+    var canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    var ctx = canvas.getContext('2d');
+    var rect = canvas.parentElement.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = 160;
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    var drawing = false;
+    var lastX, lastY;
+
+    function getPos(e) {
+      var r = canvas.getBoundingClientRect();
+      var t = e.touches ? e.touches[0] : e;
+      return {x: t.clientX - r.left, y: t.clientY - r.top};
+    }
+
+    function start(e) {
+      e.preventDefault();
+      drawing = true;
+      var p = getPos(e);
+      lastX = p.x; lastY = p.y;
+      // 隐藏提示
+      var hint = canvas.parentElement.querySelector('.sig-hint');
+      if (hint) hint.style.display = 'none';
+    }
+    function move(e) {
+      if (!drawing) return;
+      e.preventDefault();
+      var p = getPos(e);
+      ctx.beginPath();
+      ctx.moveTo(lastX, lastY);
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+      lastX = p.x; lastY = p.y;
+    }
+    function end(e) {
+      drawing = false;
+      // 保存为base64
+      var pad = canvas.parentElement;
+      var hidden = pad.querySelector('input[type=hidden]');
+      if (hidden) hidden.value = canvas.toDataURL('image/png');
+    }
+
+    canvas.addEventListener('touchstart', start);
+    canvas.addEventListener('touchmove', move);
+    canvas.addEventListener('touchend', end);
+    canvas.addEventListener('mousedown', start);
+    canvas.addEventListener('mousemove', move);
+    canvas.addEventListener('mouseup', end);
+    sigCanvases[canvasId] = canvas;
+  };
+
+  window.clearSignature = function(btn) {
+    var pad = btn.parentElement;
+    var canvas = pad.querySelector('canvas');
+    var ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    pad.querySelector('input[type=hidden]').value = '';
+    var hint = pad.querySelector('.sig-hint');
+    if (hint) hint.style.display = '';
+  };
+
+  // 文件上传
+  window.triggerFileUpload = function(el) {
+    var input = el.querySelector('input[type=file]');
+    if (input) input.click();
+  };
+
+  var uploadedFiles = {};
+  window.handleFileSelect = function(input) {
+    var container = input.parentElement;
+    var preview = container.querySelector('.fu-preview');
+    var hidden = container.querySelector('input[type=hidden]');
+    var files = Array.from(input.files);
+    var fieldName = hidden.name;
+    if (!uploadedFiles[fieldName]) uploadedFiles[fieldName] = [];
+
+    files.forEach(function(file) {
+      if (file.type.startsWith('image/')) {
+        // 图片预览
+        var reader = new FileReader();
+        reader.onload = function(e) {
+          var img = document.createElement('img');
+          img.className = 'fu-img';
+          img.src = e.target.result;
+          preview.appendChild(img);
+          uploadedFiles[fieldName].push({name: file.name, type: 'image', data: e.target.result});
+          hidden.value = JSON.stringify(uploadedFiles[fieldName]);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        // 文件显示文件名
+        var div = document.createElement('div');
+        div.className = 'fu-file';
+        div.innerHTML = '&#x1F4C4; ' + escapeHtml(file.name) + ' <span class="fu-remove" onclick="this.parentElement.remove()">&times;</span>';
+        preview.appendChild(div);
+        uploadedFiles[fieldName].push({name: file.name, type: 'file'});
+        hidden.value = JSON.stringify(uploadedFiles[fieldName]);
+      }
+    });
+  };
+
+  // ============ 新组件渲染函数 ============
+
+  // 倒计时
+  function renderCountdown(item) {
+    var target = item.target || item.deadline; // ISO date string or timestamp
+    var title = item.title || '';
+    var id = 'cd_' + Math.random().toString(36).substr(2, 6);
+    var h = '';
+    if (title) h += '<div style="text-align:center;padding:8px 16px 0;font-size:15px;font-weight:600;color:#333">' + escapeHtml(title) + '</div>';
+    h += '<div class="countdown" id="' + id + '" data-target="' + target + '">';
+    h += '<div class="countdown-item"><div class="countdown-num" id="' + id + '_d">00</div><div class="countdown-label">天</div></div>';
+    h += '<div class="countdown-item"><div class="countdown-num" id="' + id + '_h">00</div><div class="countdown-label">时</div></div>';
+    h += '<div class="countdown-item"><div class="countdown-num" id="' + id + '_m">00</div><div class="countdown-label">分</div></div>';
+    h += '<div class="countdown-item"><div class="countdown-num" id="' + id + '_s">00</div><div class="countdown-label">秒</div></div>';
+    h += '</div>';
+    // 启动倒计时（延迟执行，等DOM渲染完）
+    setTimeout(function() { startCountdown(id, target); }, 100);
+    return h;
+  }
+
+  function startCountdown(id, target) {
+    var targetTime = new Date(target).getTime();
+    function update() {
+      var now = Date.now();
+      var diff = targetTime - now;
+      var el = document.getElementById(id);
+      if (!el) return;
+      if (diff <= 0) {
+        el.classList.add('ended');
+        document.getElementById(id + '_d').textContent = '00';
+        document.getElementById(id + '_h').textContent = '00';
+        document.getElementById(id + '_m').textContent = '00';
+        document.getElementById(id + '_s').textContent = '00';
+        return;
+      }
+      var d = Math.floor(diff / 86400000);
+      var h = Math.floor((diff % 86400000) / 3600000);
+      var m = Math.floor((diff % 3600000) / 60000);
+      var s = Math.floor((diff % 60000) / 1000);
+      document.getElementById(id + '_d').textContent = d < 10 ? '0' + d : d;
+      document.getElementById(id + '_h').textContent = h < 10 ? '0' + h : h;
+      document.getElementById(id + '_m').textContent = m < 10 ? '0' + m : m;
+      document.getElementById(id + '_s').textContent = s < 10 ? '0' + s : s;
+      setTimeout(update, 1000);
+    }
+    update();
+  }
+
+  // 浏览量
+  function renderViewCount(item) {
+    var count = item.count || 0;
+    var label = item.label || '已有 <span>{n}</span> 人查看';
+    // 简单模拟：每次打开+1（实际应该从后端获取）
+    var key = 'vc_' + btoa(window.location.href).substr(0, 20);
+    try {
+      var stored = parseInt(localStorage.getItem(key)) || count;
+      stored++;
+      localStorage.setItem(key, stored);
+      count = stored;
+    } catch(e) { count++; }
+    return '<div class="view-count">' + label.replace('{n}', '<span>' + count + '</span>') + '</div>';
+  }
+
+  // vCard下载
+  function renderVCard(item) {
+    var name = item.name || '';
+    var phone = item.phone || item.tel || '';
+    var email = item.email || '';
+    var company = item.company || '';
+    var title = item.title || item.jobTitle || '';
+    var address = item.address || '';
+    var website = item.website || '';
+    // 生成vCard内容
+    var vcard = 'BEGIN:VCARD\nVERSION:3.0\n';
+    vcard += 'FN:' + name + '\n';
+    if (phone) vcard += 'TEL:' + phone + '\n';
+    if (email) vcard += 'EMAIL:' + email + '\n';
+    if (company) vcard += 'ORG:' + company + '\n';
+    if (title) vcard += 'TITLE:' + title + '\n';
+    if (address) vcard += 'ADR:;;' + address + ';;;;\n';
+    if (website) vcard += 'URL:' + website + '\n';
+    vcard += 'END:VCARD';
+    var blob = 'data:text/vcard;charset=utf-8,' + encodeURIComponent(vcard);
+    var fileName = (name || 'contact') + '.vcf';
+
+    var h = '<button class="vcard-btn" onclick="downloadVCard(this)" data-vcard="' + escapeHtml(vcard) + '" data-filename="' + escapeHtml(fileName) + '">';
+    h += '<svg viewBox="0 0 24 24" fill="none" stroke="#667eea" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>';
+    h += '保存到通讯录</button>';
+    return h;
+  }
+
+  window.downloadVCard = function(btn) {
+    var vcard = btn.getAttribute('data-vcard');
+    var filename = btn.getAttribute('data-filename');
+    var blob = new Blob([vcard], {type: 'text/vcard'});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // 地图
+  function renderMap(item) {
+    var lat = item.lat || item.latitude;
+    var lng = item.lng || item.longitude;
+    var address = item.address || '';
+    var h = '<div class="map-container">';
+    if (lat && lng) {
+      // 使用高德地图静态图（微信兼容）
+      var mapUrl = 'https://uri.amap.com/marker?position=' + lng + ',' + lat + '&src=qr-master';
+      if (address) mapUrl += '&callnative=0';
+      h += '<iframe src="' + mapUrl + '" loading="lazy"></iframe>';
+    }
+    if (address) {
+      h += '<div class="map-address">&#x1F4CD; ' + escapeHtml(address);
+      if (lat && lng) {
+        h += '<a href="https://uri.amap.com/navigation?to=' + lng + ',' + lat + ',' + encodeURIComponent(address) + '&mode=car&src=qr-master" target="_blank">导航 &raquo;</a>';
+      }
+      h += '</div>';
+    }
+    h += '</div>';
+    return h;
+  }
+
+  // 产品展示
+  function renderProduct(item) {
+    var images = item.images || (item.image ? [item.image] : []);
+    var name = item.name || '';
+    var price = item.price || '';
+    var originalPrice = item.originalPrice || '';
+    var desc = item.desc || item.description || '';
+    var contactUrl = item.contactUrl || ''; // 微信/客服链接
+    var buyUrl = item.buyUrl || ''; // 购买链接
+
+    var h = '<div class="product-card">';
+    if (images.length > 0) {
+      h += '<div class="product-gallery"><img src="' + images[0] + '" onclick=\'openFullscreen(this,' + JSON.stringify(images) + ',0)\'></div>';
+    }
+    h += '<div class="product-info">';
+    if (price) {
+      h += '<div class="product-price">&yen;' + escapeHtml(price);
+      if (originalPrice) h += '<span class="original">&yen;' + escapeHtml(originalPrice) + '</span>';
+      h += '</div>';
+    }
+    if (name) h += '<div class="product-name">' + escapeHtml(name) + '</div>';
+    if (desc) h += '<div class="product-desc">' + escapeHtml(desc) + '</div>';
+    h += '</div>';
+    if (buyUrl || contactUrl) {
+      h += '<div class="product-actions">';
+      if (contactUrl) h += '<button class="contact-btn" data-goto="' + escapeHtml(contactUrl) + '" onclick="window.location.href=this.getAttribute(\'data-goto\')">联系客服</button>';
+      if (buyUrl) h += '<button class="buy-btn" data-goto="' + escapeHtml(buyUrl) + '" onclick="window.location.href=this.getAttribute(\'data-goto\')">立即购买</button>';
+      h += '</div>';
+    }
+    h += '</div>';
+    return h;
+  }
+
+  // 活动邀请
+  function renderEvent(item) {
+    var banner = item.banner || item.image || '';
+    var title = item.title || item.name || '';
+    var date = item.date || item.datetime || '';
+    var location = item.location || item.address || '';
+    var desc = item.desc || item.description || '';
+    var lat = item.lat;
+    var lng = item.lng;
+    var rsvpForm = item.rsvpForm || null; // 报名表单字段
+
+    var h = '<div class="event-card">';
+    if (banner) h += '<img class="event-banner" src="' + banner + '">';
+    h += '<div class="event-body">';
+    if (title) h += '<div class="event-title">' + escapeHtml(title) + '</div>';
+    h += '<div class="event-meta">';
+    if (date) h += '<div class="event-meta-item"><span class="em-icon">&#x1F4C5;</span>' + escapeHtml(date) + '</div>';
+    if (location) h += '<div class="event-meta-item"><span class="em-icon">&#x1F4CD;</span>' + escapeHtml(location) + '</div>';
+    h += '</div>';
+    if (desc) h += '<div class="event-desc">' + escapeHtml(desc).replace(/\n/g, '<br>') + '</div>';
+
+    // 倒计时（如果有日期；日期格式非法时跳过倒计时，不能让它炸掉整个渲染）
+    if (date) {
+      var _d = new Date(date);
+      if (!isNaN(_d.getTime())) {
+        h += renderCountdown({target: _d.toISOString(), title: '距离活动开始'});
+      }
+    }
+
+    // 地图
+    if (lat && lng) {
+      h += renderMap({lat: lat, lng: lng, address: location});
+    }
+
+    h += '</div>';
+
+    // 报名按钮/表单
+    if (rsvpForm && rsvpForm.fields) {
+      h += '<div style="padding:0 16px 16px">';
+      h += renderFormBlock({title: '活动报名', fields: rsvpForm.fields});
+      h += '</div>';
+    } else {
+      h += '<div class="event-actions" style="padding:0 16px 16px">';
+      h += '<button class="rsvp-btn" onclick="alert(\'请联系主办方报名\')">我要报名</button>';
+      h += '</div>';
+    }
+
+    h += '</div>';
+    return h;
+  }
+
+  // 电子名片
+  function renderBizCard(item) {
+    var avatar = item.avatar || '';
+    var name = item.name || '';
+    var jobTitle = item.title || item.jobTitle || '';
+    var company = item.company || '';
+    var phone = item.phone || '';
+    var email = item.email || '';
+    var wechat = item.wechat || '';
+    var address = item.address || '';
+    var website = item.website || '';
+    var fields = item.fields || []; // 自定义字段
+
+    var h = '<div class="biz-card">';
+    h += '<div class="biz-header">';
+    if (avatar) h += '<img class="biz-avatar" src="' + avatar + '">';
+    else h += '<div class="biz-avatar" style="display:flex;align-items:center;justify-content:center;font-size:28px;background:rgba(255,255,255,.2)">&#x1F464;</div>';
+    h += '<div class="biz-name">' + escapeHtml(name) + '</div>';
+    if (jobTitle || company) h += '<div class="biz-title">' + escapeHtml(jobTitle + (company ? ' @ ' + company : '')) + '</div>';
+    h += '</div>';
+    h += '<div class="biz-body">';
+    if (phone) h += '<div class="biz-field"><div class="bf-icon">&#x1F4DE;</div><div class="bf-label">电话</div><div class="bf-value"><a href="tel:' + escapeHtml(phone) + '" style="color:#333;text-decoration:none">' + escapeHtml(phone) + '</a></div></div>';
+    if (wechat) h += '<div class="biz-field"><div class="bf-icon">&#x1F4AC;</div><div class="bf-label">微信</div><div class="bf-value">' + escapeHtml(wechat) + '</div></div>';
+    if (email) h += '<div class="biz-field"><div class="bf-icon">&#x2709;</div><div class="bf-label">邮箱</div><div class="bf-value"><a href="mailto:' + escapeHtml(email) + '" style="color:#333;text-decoration:none">' + escapeHtml(email) + '</a></div></div>';
+    if (address) h += '<div class="biz-field"><div class="bf-icon">&#x1F4CD;</div><div class="bf-label">地址</div><div class="bf-value">' + escapeHtml(address) + '</div></div>';
+    if (website) h += '<div class="biz-field"><div class="bf-icon">&#x1F310;</div><div class="bf-label">网站</div><div class="bf-value"><a href="' + escapeHtml(website) + '" target="_blank" style="color:#667eea;text-decoration:none">' + escapeHtml(website) + '</a></div></div>';
+    // 自定义字段
+    for (var i = 0; i < fields.length; i++) {
+      h += '<div class="biz-field"><div class="bf-icon">&#x2022;</div><div class="bf-label">' + escapeHtml(fields[i].label) + '</div><div class="bf-value">' + escapeHtml(fields[i].value) + '</div></div>';
+    }
+    h += '</div>';
+    // 保存到通讯录按钮
+    h += renderVCard({name: name, phone: phone, email: email, company: company, title: jobTitle, address: address, website: website});
+    h += '</div>';
+    return h;
+  }
+
+  // ============ 单文件渲染（向后兼容） ============
+  function renderSingle(mediaUrl, forceType) {
+    var type = forceType || detectType(mediaUrl);
+    var title = params.get('title') || '';
+    // 有标题就放到微信顶栏显示（原本固定显示 QR Master）
+    if (title) { try { document.title = title; } catch(e) {} }
+    var bg = params.get('bg') || '';
+    if (bg) { pageBg = bg; document.body.style.background = colorCss(bg); }
+    var h = '';
+
+    if (type === 'image') {
+      h = Renderer.singleImage(mediaUrl, title, bg);
+    } else if (type === 'video') {
+      h = Renderer.singleVideo(mediaUrl, title);
+    } else if (type === 'audio') {
+      h = Renderer.singleAudio(mediaUrl, title);
+    } else if (type === 'pdf') {
+      h = Renderer.singlePdf(mediaUrl, title, params.get('dl') !== '0');
+    } else if (type === 'office') {
+      // Office文件 → Microsoft Online Viewer（标题已在顶栏，不再压一行大字）
+      var officeLink = 'https://view.officeapps.live.com/op/view.aspx?src=' + encodeURIComponent(mediaUrl);
+      h = '<div class="doc-list" style="padding-top:40px">';
+      h += '<a class="doc-item" href="' + officeLink + '" target="_blank">';
+      h += '<div class="doc-icon doc">&#x1F4C3;</div>';
+      h += '<div class="doc-name">' + escapeHtml(getFileName(mediaUrl)) + '</div>';
+      h += '<div class="doc-arrow">&#x203A;</div></a>';
+      h += '<div style="text-align:center;margin-top:16px"><a href="' + mediaUrl + '" style="color:#667eea;font-size:13px">下载原文件</a></div>';
+      h += '</div>';
+    } else if (type === 'html') {
+      // HTML页面：仅同源内容可内嵌渲染；外域一律跳转（地址栏可见真实域名，防官方域名钓鱼）
+      var sameOrigin = false;
+      try { sameOrigin = new URL(mediaUrl, location.href).origin === location.origin; } catch(e) {}
+      if (sameOrigin) {
+        app.innerHTML = '<div class="loading">加载中...</div>';
+        fetch(mediaUrl).then(function(r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.text();
+        }).then(function(htmlContent) {
+          document.open();
+          document.write(htmlContent);
+          document.close();
+        }).catch(function(err) {
+          window.location.href = mediaUrl;
+        });
+      } else {
+        window.location.href = mediaUrl;
+      }
+      return;
+    } else {
+      // 未知类型 → 文件卡片
+      h = '<div style="padding:20px;text-align:center;min-height:100vh;display:flex;align-items:center;justify-content:center">';
+      h += '<div style="background:#fff;border-radius:16px;padding:32px 24px;box-shadow:0 4px 20px rgba(0,0,0,.08);max-width:360px;width:90%">';
+      h += '<div style="font-size:48px;margin-bottom:16px">&#x1F4C4;</div>';
+      h += '<div style="font-size:15px;color:#333;margin-bottom:16px;word-break:break-all">' + escapeHtml(getFileName(mediaUrl)) + '</div>';
+      h += '<a href="' + mediaUrl + '" download style="display:inline-block;padding:12px 32px;background:#667eea;color:#fff;text-decoration:none;border-radius:8px;font-size:14px">下载文件</a>';
+      h += '</div></div>';
+    }
+
+    app.innerHTML = h;
+    app.className = '';
+    flattenPdfFrames();
+  }
+
+  // ============ 多URL渲染（简单多文件，无manifest） ============
+  function renderMultiUrls(urls, type, title, colors) {
+    var items = urls.map(function(u, i) {
+      var it = {url: u};
+      if (colors && colors[i]) it.bgColor = colors[i];
+      // PDF下载开关：dl=0 时隐藏下载按钮
+      if (params.get('dl') === '0') it.dl = false;
+      return it;
+    });
+    var h = '';
+
+    if (type === 'image') {
+      h = Renderer.multiImage(items, title);
+    } else if (type === 'video') {
+      h = Renderer.multiVideo(items, title);
+    } else if (type === 'audio') {
+      h = Renderer.multiAudio(items, title);
+    } else {
+      // 混合类型 → 逐个渲染（标题只进微信顶栏）
+      h = '';
+      for (var i = 0; i < urls.length; i++) {
+        var t = detectType(urls[i]);
+        if (t === 'image') {
+          h += '<div style="padding:0 12px 8px"><div class="img-wrap" style="border-radius:12px;overflow:hidden" onclick="openFullscreen(this.querySelector(\'img\'))"><img src="' + urls[i] + '" style="width:100%;display:block"></div></div>';
+        } else if (t === 'video') {
+          h += '<div class="video-list"><div class="video-item"><video src="' + urls[i] + '" controls preload="metadata" playsinline></video></div></div>';
+        } else if (t === 'audio') {
+          h += '<div class="audio-list"><div class="audio-item">' + audioPlayerHtml(urls[i]) + '</div></div>';
+        } else if (t === 'pdf') {
+          h += '<div class="doc-list"><a class="doc-item" href="' + pdfViewerUrl(urls[i]) + '" target="_blank"><div class="doc-icon pdf">&#x1F4C4;</div><div class="doc-name">' + escapeHtml(getFileName(urls[i])) + '</div><div class="doc-arrow">&#x203A;</div></a></div>';
+        }
+      }
+    }
+
+    app.innerHTML = h;
+    app.className = '';
+    flattenPdfFrames();
+  }
+
+  // ============ 流量闸门：制作者流量用完则暂停展示（无 traffic 档案 = 老客户/定制版 = 不限） ============
+  function extractCid(u) {
+    // 不写死域名：按路径 /c/{cid}/ 提取，兼容COS源站、CDN自有域名及未来定制客户域名
+    var m = /\/c\/([0-9a-zA-Z]+)\//.exec(u || '');
+    return m ? m[1] : null;
+  }
+  function collectItemUrls(items) {
+    var out = [];
+    (items || []).forEach(function(it) {
+      if (!it) return;
+      if (it.url) out.push(it.url);
+      if (it.urls) out.push.apply(out, it.urls);
+    });
+    return out;
+  }
+  function showTrafficGate() {
+    app.className = 'error';
+    try { document.title = '内容暂时无法查看'; } catch (e) {}
+    app.innerHTML = '<div style="padding:70px 24px;text-align:center">' +
+      '<p style="font-size:17px;color:#333;font-weight:600;margin-bottom:10px">内容暂时无法查看</p>' +
+      '<p style="font-size:13px;color:#999;line-height:1.8">制作者正在维护中，请稍后再试<br>或联系分享这个二维码给你的人</p></div>';
+  }
+  function showExpired() {
+    app.className = 'error';
+    try { document.title = '二维码已过有效期'; } catch (e) {}
+    app.innerHTML = '<div style="padding:40px 20px;text-align:center">' +
+      '<div style="font-size:48px;margin-bottom:16px">&#x23F0;</div>' +
+      '<p style="font-size:16px;color:#333;margin-bottom:8px">该二维码已过有效期</p>' +
+      '<p style="font-size:13px;color:#999">请联系内容提供方更新</p></div>';
+  }
+  // 统一有效期检查：任何模式（manifest/多URL/单URL/活码）带 exp 参数且已过期 → 失效页
+  var _expTs = +(params.get('exp') || 0);
+  if (_expTs && Date.now() / 1000 > _expTs) { showExpired(); return; }
+  // 任一 URL 属于某客户即检查该客户流量；脚本超时/404/跨域失败一律放行（不误伤）
+  function trafficGate(urls, proceed) {
+    proceed(); return; /* 定制版(静)：流量不限，不记账不拦截 */
+    var cid = null;
+    for (var i = 0; i < urls.length && !cid; i++) cid = extractCid(urls[i]);
+    if (!cid) { proceed(); return; }
+    var done = false;
+    var finish = function(blocked) { if (done) return; done = true; if (blocked) showTrafficGate(); else proceed(); };
+    var timer = setTimeout(function() { finish(false); }, 4000);
+    var s = document.createElement('script');
+    s.src = COS_BASE + '/traffic/' + encodeURIComponent(cid) + '.js?t=' + Date.now();
+    s.onload = function() {
+      clearTimeout(timer);
+      var t = window.QRM_TRAFFIC;
+      finish(!!(t && t.cid === cid && (+(t.balance) - +(t.used)) <= 0));
+    };
+    s.onerror = function() { clearTimeout(timer); finish(false); };
+    document.head.appendChild(s);
+  }
+
+  // ============ 活码模式 ============
+  // 活码参数名用 code（COS/CDN 静态网站把 "live" 当作保留参数会返回 405）；
+  // 同时兼容旧链接上的 live 参数（github.io 老码仍在用）
+  var liveId = params.get('code') || params.get('live');
+  if (liveId) {
+    var triedGlobal = false;
+    var liveLoadTimer = null;
+    var renderLiveConfig = function() {
+      if (typeof LIVE_CONFIG === 'undefined' || !LIVE_CONFIG[liveId]) {
+        // 拆分小文件里没有该id时，回退全局大配置再找一次（拆分上传失败/延迟的兜底）
+        if (!triedGlobal) { triedGlobal = true; loadGlobalConfig(); return; }
+        clearTimeout(liveLoadTimer);
+        app.className = 'error';
+        app.innerHTML = '<p>活码不存在或已被删除</p>';
+        return;
+      }
+      clearTimeout(liveLoadTimer);
+      var config = LIVE_CONFIG[liveId];
+      // 活码标题放微信顶栏
+      if (config.title) { try { document.title = config.title; } catch(e) {} }
+      // 试用码过期检查（试用版生成的码到期失效）
+      if (config.expire && Date.now() / 1000 > config.expire) {
+        showExpired();
+        return;
+      }
+      // 活码支持以下模式（优先级从高到低）：
+      // 1. items字段 → 直接渲染组合/多媒体内容（无需fetch，微信兼容）
+      // 2. url字段 → 单文件渲染（img/video/audio标签，不走CORS）
+      // 3. manifest字段 → 旧版兼容（需fetch，可能微信不兼容）
+      // 4. urls字段 → 旧版多URL
+      var _dispatchLive = function() {
+      if (config.items && config.items.length > 0) {
+        // 新格式：items直接存在config里，无需fetch（微信兼容）
+        renderManifest({
+          title: config.title || '',
+          items: config.items,
+          galleryCols: config.galleryCols,
+          bg: config.bg || '#f5f7fa',
+          titleStyle: config.titleStyle
+        });
+      } else if (config.url) {
+        // 单文件：COS直链，用img/video/audio标签渲染（不走CORS）
+        try {
+          renderSingle(config.url, config.type || params.get('type'));
+        } catch (e) {
+          app.className = 'error';
+          app.innerHTML = '<p>加载失败：' + escapeHtml(e.message) + '</p><button class="retry" onclick="location.reload()">重试</button>';
+        }
+      } else if (config.manifest) {
+        // 旧版兼容：manifest URL需要fetch（微信可能拦截）
+        fetch(config.manifest).then(function(r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        }).then(function(data) {
+          renderManifest(data);
+        }).catch(function(err) {
+          app.className = 'error';
+          app.innerHTML = '<p>加载失败</p><button class="retry" onclick="location.reload()">重试</button>';
+        });
+      } else if (config.urls) {
+        // 旧版多URL
+        var type = config.type || 'auto';
+        if (type === 'auto' && config.urls.length > 0) type = detectType(config.urls[0]);
+        renderMultiUrls(config.urls, type, config.title || '');
+      } else {
+        app.className = 'error';
+        app.innerHTML = '<p>活码配置无效</p>';
+      }
+      };
+      trafficGate(config.items ? collectItemUrls(config.items) : (config.url ? [config.url] : (config.urls || (config.manifest ? [config.manifest] : []))), _dispatchLive);
+    };
+    // 优先按ID加载拆分的小配置文件（几KB，秒开）；不存在再回退全局大配置（兼容老码）
+    // 10秒无响应给重试入口（COS挂起时onerror不一定触发）
+    liveLoadTimer = setTimeout(function() {
+      app.className = 'error';
+      app.innerHTML = '<p>加载超时，请检查网络</p><button class="retry" onclick="location.reload()">重试</button>';
+    }, 10000);
+    var loadGlobalConfig = function() {
+      var s2 = document.createElement('script');
+      s2.src = COS_BASE + '/_live_config.js?t=' + Date.now();
+      s2.onload = renderLiveConfig;
+      s2.onerror = function() {
+        clearTimeout(liveLoadTimer);
+        app.className = 'error';
+        app.innerHTML = '<p>加载失败，请检查网络</p><button class="retry" onclick="location.reload()">重试</button>';
+      };
+      document.head.appendChild(s2);
+    };
+    var script = document.createElement('script');
+    script.src = COS_BASE + '/live/' + encodeURIComponent(liveId) + '.js?t=' + Date.now();
+    script.onload = renderLiveConfig;
+    script.onerror = loadGlobalConfig;
+    document.head.appendChild(script);
+    return;
+  }
+
+  // ============ Manifest 模式 ============
+  var manifestUrl = params.get('manifest');
+  if (manifestUrl) {
+    trafficGate([manifestUrl], function() {
+    fetch(manifestUrl).then(function(r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    }).then(function(data) {
+      // manifest 自带 expire 字段（试用静态清单）→ 失效页
+      if (data && data.expire && Date.now() / 1000 > data.expire) { showExpired(); return; }
+      renderManifest(data);
+    }).catch(function(err) {
+      app.className = 'error';
+      app.innerHTML = '<p>加载失败</p><p style="font-size:12px;color:#bbb">' + err.message + '</p><button class="retry" onclick="location.reload()">重试</button>';
+    });
+    });
+    return;
+  }
+
+  // ============ 多URL模式（管道分隔） ============
+  var multiUrls = params.get('urls');
+  if (multiUrls) {
+    var urls = multiUrls.split('|').map(safeUrl).filter(Boolean);
+    var type = params.get('type') || 'auto';
+    var title = params.get('title') || '';
+    var bgParam = params.get('bg') || '';
+    if (bgParam) { pageBg = bgParam; document.body.style.background = colorCss(bgParam); }
+    var colorsParam = (params.get('colors') || '').split('|');
+    if (type === 'auto' && urls.length > 0) {
+      type = detectType(urls[0]); // 用第一个URL推断类型
+    }
+    trafficGate(urls, function() { renderMultiUrls(urls, type, title, colorsParam); });
+    return;
+  }
+
+  // ============ 单URL模式（向后兼容） ============
+  var mediaUrl = safeUrl(params.get('url'));
+  if (mediaUrl) {
+    trafficGate([mediaUrl], function() { renderSingle(mediaUrl, params.get('type')); });
+    return;
+  }
+
+  // ============ 预览模式（编辑器 iframe 实时预览，postMessage 接收 manifest） ============
+  if (params.get('preview')) {
+    document.body.style.background = '#f5f7fa';
+    app.innerHTML = '<div style="padding:80px 20px;text-align:center;color:#98A2B3;font-size:13px;line-height:1.8">在左边编辑内容<br>这里实时显示手机扫码效果</div>';
+    window.addEventListener('message', function(e) {
+      var d = e.data;
+      if (!d || d.type !== 'qrm-preview' || !d.manifest) return;
+      try { renderManifest(d.manifest); } catch (err) {}
+    });
+    // 握手：告诉父页面预览已就绪（编辑器收到后才推送内容，避免消息丢失）
+    if (window.parent && window.parent !== window) {
+      try { window.parent.postMessage({type: 'qrm-preview-ready'}, '*'); } catch (e) {}
+    }
+    return;
+  }
+
+  // ============ 无参数 ============
+  app.className = 'error';
+  app.innerHTML = '<p>缺少参数</p><p style="font-size:12px;color:#bbb;margin-top:8px">请使用QR Master生成二维码</p>';
+})();
+</script>
+</body>
+</html>
